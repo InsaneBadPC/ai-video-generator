@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="cs">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>AI Music Video Generator</title>
+  <style>
+    :root{color-scheme:dark;font-family:system-ui,sans-serif}body{margin:0;background:#10131a;color:#eef1f7}main{max-width:1100px;margin:auto;padding:20px}h1{font-size:1.5rem}.cards{display:flex;gap:10px;flex-wrap:wrap}.card{background:#1b2130;border:1px solid #30394d;border-radius:10px;padding:12px;min-width:120px}.jobs{display:grid;gap:10px;margin-top:18px}.job{background:#181e2a;border:1px solid #30394d;border-radius:10px;padding:12px}.meta{color:#aab4c8;font-size:.88rem}.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}button{border:0;border-radius:7px;padding:8px 12px;background:#3c82f6;color:#fff;cursor:pointer}button.reject{background:#b93852}button.retry{background:#5a667d}code{color:#9bd1ff}.error{color:#ff9cae}
+  </style>
+</head>
+<body><main>
+  <h1>AI Music Video Generator</h1>
+  <div id="stats" class="cards"></div>
+  <h2>Produkční zdroje</h2><div id="resources" class="cards"></div>
+  <p id="message" class="meta">Načítám…</p>
+  <section id="jobs" class="jobs"></section>
+<script>
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+async function api(path,opt){const r=await fetch(path,opt);if(!r.ok)throw new Error(await r.text());return r.json()}
+async function action(id,a){await api('/api/jobs/'+encodeURIComponent(id)+'/action',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:a})});load()}
+async function load(){try{const [s,j,r]=await Promise.all([api('/api/stats'),api('/api/jobs'),api('/api/resources')]);document.querySelector('#stats').innerHTML=Object.entries(s).map(([k,v])=>`<div class="card"><b>${esc(k)}</b><br><strong>${v}</strong></div>`).join('')||'<div class="card">Fronta je prázdná</div>';document.querySelector('#resources').innerHTML=Object.entries(r).map(([k,v])=>`<div class="card"><b>${esc(k)}</b><br>${v?'dostupné':'vypnuto'}</div>`).join('');document.querySelector('#jobs').innerHTML=j.map(x=>`<article class="job"><b>${esc(x.song_id)} / ${esc(x.label)}</b><div class="meta">${esc(x.status)} · tier ${esc(x.tier||'-')} · pokus ${x.attempts} · job <code>${esc(x.job_id)}</code></div>${x.error?`<div class="error">${esc(x.error)}</div>`:''}<div class="actions"><button onclick="action('${esc(x.job_id)}','approve')">Schválit / Retry</button><button class="reject" onclick="action('${esc(x.job_id)}','reject')">Zamítnout</button><button class="retry" onclick="action('${esc(x.job_id)}','retry')">Vrátit do fronty</button></div></article>`).join('')||'<div class="card">Žádné úlohy</div>';document.querySelector('#message').textContent='Aktualizováno '+new Date().toLocaleTimeString()}catch(e){document.querySelector('#message').textContent='Chyba: '+e.message;document.querySelector('#message').className='error'}}
+load();setInterval(load,5000);
+</script></main></body></html>

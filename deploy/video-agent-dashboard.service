@@ -1,0 +1,21 @@
+[Unit]
+Description=AI Music Video Generator Dashboard
+After=network-online.target video-agent.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/opt/video-agent
+EnvironmentFile=/opt/video-agent/.env
+ExecStart=/opt/video-agent/.venv/bin/uvicorn dashboard.server:app --host 127.0.0.1 --port 8080
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=false
+ReadWritePaths=/opt/video-agent/queue /opt/video-agent/state /opt/video-agent/logs
+
+[Install]
+WantedBy=multi-user.target
