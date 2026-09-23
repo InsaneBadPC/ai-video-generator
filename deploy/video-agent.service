@@ -1,0 +1,38 @@
+# MDM — Music Dashboard Maker (AI Music Video Generator)
+# systemd unit pro Oracle Cloud Always Free VM (Ubuntu).
+# Spouští dispatcher jako službu (Restart=always), logy do journal.
+#
+# Instalace na VM:
+#   sudo cp deploy/video-agent.service /etc/systemd/system/
+#   sudo mkdir -p /opt/video-agent && sudo chown -R $USER:$USER /opt/video-agent
+#   (nakopírovat kód: rsync -a ai-video-generator/ /opt/video-agent/)
+#   sudo nano /opt/video-agent/.env        # vyplnit tajemství (chmod 600)
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now video-agent
+#
+# Zkontrolovat:  journalctl -u video-agent -f
+
+[Unit]
+Description=AI Music Video Generator (queue dispatcher)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/opt/video-agent
+EnvironmentFile=/opt/video-agent/.env
+ExecStart=/usr/bin/python3 /opt/video-agent/pipeline/dispatcher.py --loop --sleep 30
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+# Zabezpečení
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=false
+ReadWritePaths=/opt/video-agent/output /opt/video-agent/queue /opt/video-agent/state /opt/video-agent/logs
+
+[Install]
+WantedBy=multi-user.target

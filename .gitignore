@@ -1,0 +1,15 @@
+.env
+input/*
+!input/.gitkeep
+output/*
+!output/.gitkeep
+logs/*
+queue/*
+state/*
+__pycache__/
+*.pyc
+character_reference/*
+!character_reference/.gitkeep
+*.mp4
+*.wav
+*.mp3

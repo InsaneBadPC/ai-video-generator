@@ -1,0 +1,65 @@
+# AI Music Video Generator — konfigurace (bez tajemství)
+# Klíče jdou z .env; tady jen volby běhu.
+
+pipeline:
+  # Role/moduly vyměnitelné — pořadí pokusů při neshodě/přeskočení
+  mode: full_scenes            # full_scenes | image_animation (kap. 8)
+  llm_backends: [gemini, openrouter, groq]
+  image_backends: [hf_flux, kaggle]
+  video_backends: [local_loop, local_kb, hf_wan, kaggle]
+
+image_animator:
+  svd_space: multimodalart/stable-video-diffusion
+  variants: 3                  # vždy 3 chained verze → jedna dlouhá animace
+  prompt_mode: "prompt"        # animace vychází z promptu (i2v: Wan)
+
+loop_library:
+  dir: /storage/emulated/0/Pictures/Track Images
+  local_res: "864x480"          # rozlišení lokálních klipů
+  local_fps: 24
+  kb_seconds: 4                 # délka Ken Burns klipu
+
+llm:
+  openrouter:
+    model: google/gemini-2.5-flash
+    base: https://openrouter.ai/api/v1
+  groq:
+    model: openai/gpt-oss-120b
+    base: https://api.groq.com/openai/v1
+  gemini:
+    model: gemini-3.6-flash
+    base: https://generativelanguage.googleapis.com/v1beta/openai
+
+hf:
+  default_via: gradio_client     # primární cesta volání Spaces
+  zero_gpu_timeout_s: 900
+  request_timeout_s: 60
+
+kaggle:
+  cores_used: 2                  # Always Free limit
+  weekly_hours_limit: 30
+  enable: true                     # zapnout — R2 klíče v .env
+
+cc_tier:                        # back-to-basic: editable assembly
+  text_overlay: true
+  punch_in_sync: true
+
+qc:
+  enabled: true
+  min_clip_similarity: 0.45      # CLIP cosine prag, pod ním auto-retry
+
+queue:
+  sqlite_path: queue/jobs.db
+
+storage:
+  r2: false                     # true až budou R2 klíče v .env
+  r2_endpoint: https://<accountid>.r2.cloudflarestorage.com
+
+orchestrator:
+  sleep_loop_s: 30
+  max_retries: 4
+  log_dir: logs
+
+telegram:
+  enabled: false                # true až bude TELEGRAM_CHAT_ID v .env
+  approve_points: [storyboard, character_reference]
