@@ -24,7 +24,7 @@ def enabled() -> bool:
 def _client():
     if not enabled():
         raise StorageError("R2 je vypnuté (STORAGE_R2_ENABLED není true)")
-    required = ["CLOUDFLARE_R2_ACCESS_KEY", "CLOUDFLARE_R2_SECRET_KEY",
+    required = ["CLOUDFLARE_R2_ACCESS_KEY_ID", "CLOUDFLARE_R2_SECRET_ACCESS_KEY",
                 "CLOUDFLARE_R2_BUCKET", "CLOUDFLARE_R2_ENDPOINT"]
     missing = [name for name in required if not os.environ.get(name)]
     if missing:
@@ -36,8 +36,8 @@ def _client():
     return boto3.client(
         "s3",
         endpoint_url=os.environ["CLOUDFLARE_R2_ENDPOINT"],
-        aws_access_key_id=os.environ["CLOUDFLARE_R2_ACCESS_KEY"],
-        aws_secret_access_key=os.environ["CLOUDFLARE_R2_SECRET_KEY"],
+        aws_access_key_id=os.environ["CLOUDFLARE_R2_ACCESS_KEY_ID"],
+        aws_secret_access_key=os.environ["CLOUDFLARE_R2_SECRET_ACCESS_KEY"],
         region_name="auto",
     )
 

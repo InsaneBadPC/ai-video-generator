@@ -52,7 +52,7 @@ queue:
   sqlite_path: queue/jobs.db
 
 storage:
-  r2: false                     # true až budou R2 klíče v .env
+  r2: true                      # R2 bucket ai-video-generator, creds v .env
   r2_endpoint: https://<accountid>.r2.cloudflarestorage.com
 
 orchestrator:
