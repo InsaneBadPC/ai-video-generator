@@ -8,6 +8,8 @@ queue/*
 state/*
 __pycache__/
 *.pyc
+.venv/
+.pytest_cache/
 character_reference/*
 !character_reference/.gitkeep
 *.mp4

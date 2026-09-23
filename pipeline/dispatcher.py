@@ -72,6 +72,24 @@ def _make_local_clip(job: dict, library_dir: str) -> Path | None:
         return None
 
 
+def _make_local_kb(job: dict, library_dir: str) -> Path | None:
+    """Vybere obrázek a vytvoří Ken Burns klip."""
+    from . import local_clip, loop_library
+
+    lib = loop_library.index_library(library_dir)
+    images = [m for m in lib if m.kind == "ref_img"]
+    media = loop_library.select_scene_media(
+        job.get("label") or job.get("section") or "verse",
+        used_hashes=_USED, library=images,
+    )
+    if not media:
+        log.info("[dispatch] scéna %s: knihovna obrázků prázdná", job.get("label"))
+        return None
+    _USED.add(media.hash)
+    kb_s = int((load_config().get("loop_library") or {}).get("kb_seconds", 4))
+    return local_clip.ken_burns(media.path, int(job.get("seed") or 0), max(kb_s, 3))
+
+
 def _make_hf_clip(job: dict) -> Path:
     from . import video_backend
 
@@ -118,10 +136,9 @@ def process_one(db: str = DEFAULT_DB, tier_hooks: dict | None = None) -> bool:
     for tier in tier_chain:
         try:
             if tier == "local_loop" or tier == "local_kb":
-                clip = _make_local_clip(job, library_dir) if tier == "local_loop" else None
-                # local_loop vrátí klip z knihovny; local_kb jako komplementární
-                if clip is None and tier == "local_loop":
-                    clip = _make_local_clip(job, library_dir)
+                clip = (_make_local_clip(job, library_dir)
+                        if tier == "local_loop"
+                        else _make_local_kb(job, library_dir))
             elif tier == "hf_wan":
                 clip = _make_hf_clip(job)
             elif tier == "kaggle":
@@ -155,6 +172,7 @@ def process_one(db: str = DEFAULT_DB, tier_hooks: dict | None = None) -> bool:
 
 def run_queue(db: str = DEFAULT_DB, once: bool = False) -> int:
     """Main loop wokru — zpracuje frontu. once=True → jen jeden job pro test."""
+    q.recover_stale(db)
     n = 0
     while True:
         more = process_one(db)

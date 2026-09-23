@@ -26,6 +26,8 @@ def _conn(db: str) -> sqlite3.Connection:
     Path(db).parent.mkdir(parents=True, exist_ok=True)
     c = sqlite3.connect(db, timeout=30)
     c.row_factory = sqlite3.Row
+    c.execute("PRAGMA journal_mode=WAL")
+    c.execute("PRAGMA busy_timeout=30000")
     return c
 
 
@@ -80,6 +82,18 @@ def claim(db: str, worker: str = "") -> dict | None:
             return None
         cur = c.execute("SELECT * FROM jobs WHERE job_id=?", (row["job_id"],))
         return dict(cur.fetchone())
+
+
+def recover_stale(db: str = DEFAULT_DB, stale_after: int = 1800) -> int:
+    """Vrátí úlohy zamrzlé po pádu workeru zpět do fronty."""
+    cutoff = time.time() - stale_after
+    with _conn(db) as c:
+        cur = c.execute(
+            "UPDATE jobs SET status='queued', error=? "
+            "WHERE status='running' AND started IS NOT NULL AND started < ?",
+            ("worker restart: stale running job recovered", cutoff),
+        )
+        return cur.rowcount
 
 
 def finish(db: str, job_id: str, clip_path: str = "", tier: str = "",

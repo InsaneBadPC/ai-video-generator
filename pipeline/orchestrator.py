@@ -142,6 +142,14 @@ def main(argv=None):
         final = run_e2e(a.audio, a.title, a.force_storyboard, a.db, a.chunk_s)
     print(f"\nFINAL VYSTUP: {final} ({final.stat().st_size} B)")
     try:
+        from . import storage_r2
+        storage_cfg = cfg.get("storage") or {}
+        if storage_cfg.get("r2") and storage_r2.enabled():
+            key = storage_r2.upload_file(final, f"videos/{final.name}")
+            log.info("R2 upload dokončen: %s", key)
+    except Exception as exc:
+        log.warning("R2 upload přeskočen, lokální výstup zůstává: %r", exc)
+    try:
         from . import notify
         if notify.enabled():
             notify.notify(f"✅ Video hotové: {a.title}\n{final}")
@@ -174,7 +182,12 @@ def _run_anim_e2e(audio: str, image: str, prompt: str, title: str) -> Path:
     init(db)
     add_scene_job(db, Path(audio).stem, 0, "image_animation",
                   "cover", prompt, seed=1, job_type="image_animation")
-    final = image_animator.run_image_animation(image, audio, prompt)
+    try:
+        final = image_animator.run_image_animation(image, audio, prompt)
+    except Exception as exc:
+        q.finish(db, job_id, error=repr(exc))
+        raise
+    q.finish(db, job_id, clip_path=str(final), tier="image_animation")
     return final
 
 

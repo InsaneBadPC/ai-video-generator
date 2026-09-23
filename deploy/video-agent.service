@@ -6,6 +6,7 @@
 #   sudo cp deploy/video-agent.service /etc/systemd/system/
 #   sudo mkdir -p /opt/video-agent && sudo chown -R $USER:$USER /opt/video-agent
 #   (nakopírovat kód: rsync -a ai-video-generator/ /opt/video-agent/)
+#   python3 -m venv /opt/video-agent/.venv && /opt/video-agent/.venv/bin/pip install -r /opt/video-agent/requirements.txt
 #   sudo nano /opt/video-agent/.env        # vyplnit tajemství (chmod 600)
 #   sudo systemctl daemon-reload
 #   sudo systemctl enable --now video-agent
@@ -23,7 +24,7 @@ User=ubuntu
 Group=ubuntu
 WorkingDirectory=/opt/video-agent
 EnvironmentFile=/opt/video-agent/.env
-ExecStart=/usr/bin/python3 /opt/video-agent/pipeline/dispatcher.py --loop --sleep 30
+ExecStart=/opt/video-agent/.venv/bin/python /opt/video-agent/pipeline/dispatcher.py --loop --sleep 30
 Restart=always
 RestartSec=10
 StandardOutput=journal
@@ -32,7 +33,7 @@ StandardError=journal
 NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=false
-ReadWritePaths=/opt/video-agent/output /opt/video-agent/queue /opt/video-agent/state /opt/video-agent/logs
+ReadWritePaths=/opt/video-agent/input /opt/video-agent/output /opt/video-agent/queue /opt/video-agent/state /opt/video-agent/logs /opt/video-agent/character_reference
 
 [Install]
 WantedBy=multi-user.target
