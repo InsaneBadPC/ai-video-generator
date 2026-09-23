@@ -19,8 +19,7 @@ import logging
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-from llm_client import chat_json
+from .llm_client import chat_json
 
 log = logging.getLogger("storyboard")
 
@@ -75,7 +74,11 @@ def generate_storyboard(audio_map_path: str, lyrics: str | None = None,
     tempo = f"{amap.get('bpm', 0):.0f} BPM" if amap.get("bpm") else None
 
     prompt = _build_prompt(amap, text, tempo)
-    scenes = chat_json(prompt, max_tokens=4096)
+    try:
+        scenes = chat_json(prompt, max_tokens=4096)
+    except Exception as exc:
+        log.warning("[storyboard] LLM nedostupné, používám deterministický fallback: %r", exc)
+        scenes = _fallback_scenes(amap, text)
     # normalizace: výsledek může být list nebo {"scenes": [...]}
     if isinstance(scenes, dict):
         scenes = scenes.get("scenes") or scenes.get("storyboard") or []
@@ -88,6 +91,32 @@ def generate_storyboard(audio_map_path: str, lyrics: str | None = None,
         Path(out_path).write_text(json.dumps(out, ensure_ascii=False, indent=2), encoding="utf-8")
         log.info("Uložen storyboard -> %s (%d scén)", out_path, len(scenes))
     return out
+
+
+def _fallback_scenes(audio_map: dict, lyrics: str) -> list[dict]:
+    """Vytvoří validní storyboard i bez externího LLM/API."""
+    lines = [line.strip() for line in lyrics.splitlines() if line.strip()]
+    result = []
+    for i, section in enumerate(audio_map.get("sections") or []):
+        start, end = float(section.get("start_s", 0)), float(section.get("end_s", 0))
+        if end - start < 0.1:
+            continue
+        label = section.get("label", "verse")
+        lyric = lines[i % len(lines)] if lines else ""
+        motion = "slow dolly in" if label == "verse" else "handheld neon pulse"
+        result.append({
+            "scene": i, "start_s": start, "end_s": end, "label": label,
+            "lyric_line": lyric, "image_prompt":
+            "Temney in a rain-soaked neon city at night, cinematic gritty portrait, "
+            "consistent character, moody blue and magenta lighting",
+            "video_prompt": f"{motion}, drifting rain, subtle natural movement",
+            "overlay_text": label.title(),
+        })
+    return result or [{
+        "scene": 0, "start_s": 0, "end_s": float(audio_map.get("duration_s", 1)),
+        "label": "whole", "lyric_line": "", "image_prompt": CHARACTER_BIBLE,
+        "video_prompt": "slow cinematic camera movement", "overlay_text": "",
+    }]
 
 
 if __name__ == "__main__":

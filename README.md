@@ -57,6 +57,16 @@ python3 pipeline/dispatcher.py --loop --sleep 30
 
 Worker používá SQLite v režimu WAL a po startu vrací úlohy, které zůstaly ve stavu `running` po pádu procesu, zpět do fronty.
 
+## Dashboard
+
+Dashboard je v `dashboard/` a používá stejnou SQLite frontu jako worker. Nastavte `DASHBOARD_USER` a `DASHBOARD_PASSWORD`, spusťte `video-agent-dashboard.service` a připojte se bezpečně přes SSH tunel:
+
+```bash
+ssh -L 8080:127.0.0.1:8080 ubuntu@VM_IP
+```
+
+Poté otevřete `http://127.0.0.1:8080`. Služba naslouchá pouze na localhostu VM; nevystavuje port 8080 přímo do internetu.
+
 ## Nasazení
 
 Unit `deploy/video-agent.service` je šablona pro Oracle VM. Před instalací upravte `WorkingDirectory`, nainstalujte závislosti do systémového Pythonu nebo změňte `ExecStart` na cestu k virtualenv a ověřte oprávnění adresářů. R2, Telegram a Kaggle musí zůstat vypnuté, dokud nejsou jejich credentials a testy hotové.

@@ -24,7 +24,8 @@ User=ubuntu
 Group=ubuntu
 WorkingDirectory=/opt/video-agent
 EnvironmentFile=/opt/video-agent/.env
-ExecStart=/opt/video-agent/.venv/bin/python /opt/video-agent/pipeline/dispatcher.py --loop --sleep 30
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/opt/video-agent/.venv/bin/python -m pipeline.dispatcher --loop --sleep 30
 Restart=always
 RestartSec=10
 StandardOutput=journal

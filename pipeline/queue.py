@@ -42,6 +42,7 @@ def init(db: str = DEFAULT_DB) -> None:
                 label TEXT,
                 prompt TEXT,
                 seed INTEGER,
+                duration REAL,
                 pre_media TEXT,          -- 'auto' | path | 'local_loop' ...
                 status TEXT NOT NULL DEFAULT 'queued',
                 attempts INTEGER DEFAULT 0,
@@ -51,19 +52,23 @@ def init(db: str = DEFAULT_DB) -> None:
                 job_type TEXT DEFAULT 'full_scene',   -- full_scene | image_animation
                 created REAL, started REAL, finished REAL
             )""")
+        columns = {row[1] for row in c.execute("PRAGMA table_info(jobs)").fetchall()}
+        if "duration" not in columns:
+            c.execute("ALTER TABLE jobs ADD COLUMN duration REAL")
         c.execute("CREATE INDEX IF NOT EXISTS ix_status ON jobs(status)")
 
 
 def add_scene_job(db: str, song_id: str, scene_idx: int, section: str,
                   label: str, prompt: str, seed: int = 0,
-                  pre_media: str = "auto", job_type: str = "full_scene") -> str:
+                  pre_media: str = "auto", job_type: str = "full_scene",
+                  duration: float | None = None) -> str:
     init(db)
     job_id = str(uuid.uuid4())[:12]
     with _conn(db) as c:
         c.execute("""INSERT INTO jobs (job_id,song_id,scene_idx,section,label,prompt,
-                     seed,pre_media,status,created,job_type) VALUES (?,?,?,?,?,?,?,?,?,?,?)
+                     seed,duration,pre_media,status,created,job_type) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
                   """, (job_id, song_id, scene_idx, section, label, prompt, seed,
-                        pre_media, "queued", time.time(), job_type))
+                        duration, pre_media, "queued", time.time(), job_type))
     log.info("[queue] job %s scene %d (%s) přidán", job_id, scene_idx, job_type)
     return job_id
 
@@ -86,6 +91,7 @@ def claim(db: str, worker: str = "") -> dict | None:
 
 def recover_stale(db: str = DEFAULT_DB, stale_after: int = 1800) -> int:
     """Vrátí úlohy zamrzlé po pádu workeru zpět do fronty."""
+    init(db)
     cutoff = time.time() - stale_after
     with _conn(db) as c:
         cur = c.execute(

@@ -17,6 +17,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import math
 import sqlite3
 import sys
 import time
@@ -54,7 +55,7 @@ def plan_jobs(sb: dict, name: str, db: str, chunk_s: int = CHUNK_S) -> int:
     for sc in scenes:
         st, en = sc["start_s"], sc["end_s"]
         label = sc.get("label") or sc.get("section") or "verse"
-        n_chunks = max(1, int((en - st) / chunk_s))
+        n_chunks = max(1, math.ceil((en - st) / chunk_s))
         for k in range(n_chunks):
             cst = st + k * chunk_s
             cend = min(cst + chunk_s, en)
@@ -63,7 +64,7 @@ def plan_jobs(sb: dict, name: str, db: str, chunk_s: int = CHUNK_S) -> int:
             q.add_scene_job(db, name, int(sc.get("scene") or added), label,
                             f"{label}@{int(cst)}-{int(cend)}",
                             prompt, seed=seed + added,
-                            pre_media="auto")
+                            pre_media="auto", duration=max(0.1, cend - cst))
             added += 1
     return added
 
@@ -144,7 +145,7 @@ def main(argv=None):
     try:
         from . import storage_r2
         storage_cfg = cfg.get("storage") or {}
-        if storage_cfg.get("r2") and storage_r2.enabled():
+        if (storage_cfg.get("r2") or storage_r2.enabled()) and storage_r2.enabled():
             key = storage_r2.upload_file(final, f"videos/{final.name}")
             log.info("R2 upload dokončen: %s", key)
     except Exception as exc:
@@ -180,8 +181,8 @@ def _run_anim_e2e(audio: str, image: str, prompt: str, title: str) -> Path:
     db = DEFAULT_QUEUE_DB
     Path(db).unlink(missing_ok=True)
     init(db)
-    add_scene_job(db, Path(audio).stem, 0, "image_animation",
-                  "cover", prompt, seed=1, job_type="image_animation")
+    job_id = add_scene_job(db, Path(audio).stem, 0, "image_animation",
+                           "cover", prompt, seed=1, job_type="image_animation")
     try:
         final = image_animator.run_image_animation(image, audio, prompt)
     except Exception as exc:

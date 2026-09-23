@@ -1,0 +1,9 @@
+{
+  "name": "AI Music Video Generator",
+  "short_name": "Video Agent",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#10131a",
+  "theme_color": "#3c82f6",
+  "icons": [{"src": "/static/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable"}]
+}
