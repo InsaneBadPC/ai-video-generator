@@ -11,10 +11,11 @@ import time
 import uuid
 from pathlib import Path
 
-from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile, status
+from fastapi import Depends, FastAPI, Form, HTTPException, Request, status
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from pydantic import BaseModel
+from starlette.datastructures import UploadFile
 
 ROOT = Path(__file__).resolve().parents[1]
 DB_PATH = Path(os.environ.get("QUEUE_DB", ROOT / "queue/jobs.db"))
@@ -89,51 +90,59 @@ def logs(_user: str = Depends(auth)):
 
 
 @app.post("/api/generate")
-async def generate(
-    audio: UploadFile = File(...),
-    image: UploadFile | None = File(None),
-    prompt: str = Form(""),
-    title: str = Form("Temney"),
-    mode: str = Form("full_scenes"),
-    _user: str = Depends(auth),
-):
-    if mode not in {"full_scenes", "image_animation"}:
-        raise HTTPException(400, "Neplatný režim")
-    if not audio.filename:
-        raise HTTPException(400, "Vyber MP3 nebo jiný audio soubor z telefonu")
-    if mode == "image_animation" and (not image or not image.filename):
-        raise HTTPException(400, "Pro image_animation je potřeba obrázek")
-    run_id = uuid.uuid4().hex[:12]
-    RUNS.mkdir(parents=True, exist_ok=True)
-    audio_path = ROOT / "input" / f"{run_id}_{Path(audio.filename).name}"
-    audio_path.parent.mkdir(parents=True, exist_ok=True)
-    with audio_path.open("wb") as out:
-        shutil.copyfileobj(audio.file, out)
-    image_path = None
-    if image and image.filename:
-        image_path = ROOT / "character_reference" / f"{run_id}_{Path(image.filename).name}"
-        image_path.parent.mkdir(parents=True, exist_ok=True)
-        with image_path.open("wb") as out:
-            shutil.copyfileobj(image.file, out)
-    if prompt:
-        (ROOT / "input" / f"{run_id}_{Path(audio.filename).stem}.txt").write_text(prompt, encoding="utf-8")
-    log_path = ROOT / "logs" / f"run_{run_id}.log"
-    log_path.parent.mkdir(parents=True, exist_ok=True)
-    cmd = [sys.executable, "-m", "pipeline.orchestrator", "--mode", mode,
-           "--audio", str(audio_path.relative_to(ROOT)), "--title", title]
-    if image_path:
-        cmd += ["--image", str(image_path.relative_to(ROOT))]
-    if prompt:
-        cmd += ["--prompt", prompt]
-    with log_path.open("w") as log_file:
-        proc = subprocess.Popen(cmd, cwd=ROOT, stdout=log_file, stderr=subprocess.STDOUT,
-                                start_new_session=True)
-    record = {"run_id": run_id, "pid": proc.pid, "status": "running", "mode": mode,
-              "title": title, "prompt": prompt, "audio": str(audio_path.name),
-              "image": image_path.name if image_path else None, "log": str(log_path),
-              "created": time.time()}
-    (RUNS / f"{run_id}.json").write_text(json.dumps(record, ensure_ascii=False, indent=2))
-    return record
+async def generate(request: Request, _user: str = Depends(auth)):
+    # Starlette 1.7 defaults each multipart part to 1 MiB; full songs exceed that.
+    form = await request.form(max_files=2, max_fields=3, max_part_size=50 * 1024 * 1024)
+    try:
+        audio = form.get("audio")
+        image = form.get("image")
+        prompt = form.get("prompt", "")
+        title = form.get("title", "Temney")
+        mode = form.get("mode", "full_scenes")
+        if not isinstance(audio, UploadFile) or not audio.filename:
+            raise HTTPException(400, "Vyber MP3 nebo jiný audio soubor z telefonu")
+        if image is not None and not isinstance(image, UploadFile):
+            raise HTTPException(400, "Neplatný soubor obrázku")
+        if not all(isinstance(value, str) for value in (prompt, title, mode)):
+            raise HTTPException(400, "Neplatné textové pole")
+        if mode not in {"full_scenes", "image_animation"}:
+            raise HTTPException(400, "Neplatný režim")
+        if mode == "image_animation" and (not image or not image.filename):
+            raise HTTPException(400, "Pro image_animation je potřeba obrázek")
+
+        run_id = uuid.uuid4().hex[:12]
+        RUNS.mkdir(parents=True, exist_ok=True)
+        audio_path = ROOT / "input" / f"{run_id}_{Path(audio.filename).name}"
+        audio_path.parent.mkdir(parents=True, exist_ok=True)
+        with audio_path.open("wb") as out:
+            shutil.copyfileobj(audio.file, out)
+        image_path = None
+        if image and image.filename:
+            image_path = ROOT / "character_reference" / f"{run_id}_{Path(image.filename).name}"
+            image_path.parent.mkdir(parents=True, exist_ok=True)
+            with image_path.open("wb") as out:
+                shutil.copyfileobj(image.file, out)
+        if prompt:
+            (ROOT / "input" / f"{run_id}_{Path(audio.filename).stem}.txt").write_text(prompt, encoding="utf-8")
+        log_path = ROOT / "logs" / f"run_{run_id}.log"
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        cmd = [sys.executable, "-m", "pipeline.orchestrator", "--mode", mode,
+               "--audio", str(audio_path.relative_to(ROOT)), "--title", title]
+        if image_path:
+            cmd += ["--image", str(image_path.relative_to(ROOT))]
+        if prompt:
+            cmd += ["--prompt", prompt]
+        with log_path.open("w") as log_file:
+            proc = subprocess.Popen(cmd, cwd=ROOT, stdout=log_file, stderr=subprocess.STDOUT,
+                                    start_new_session=True)
+        record = {"run_id": run_id, "pid": proc.pid, "status": "running", "mode": mode,
+                  "title": title, "prompt": prompt, "audio": str(audio_path.name),
+                  "image": image_path.name if image_path else None, "log": str(log_path),
+                  "created": time.time()}
+        (RUNS / f"{run_id}.json").write_text(json.dumps(record, ensure_ascii=False, indent=2))
+        return record
+    finally:
+        await form.close()
 
 
 @app.get("/api/runs")

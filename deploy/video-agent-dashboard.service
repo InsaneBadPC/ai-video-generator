@@ -15,7 +15,7 @@ RestartSec=5
 NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=false
-ReadWritePaths=/opt/video-agent/queue /opt/video-agent/state /opt/video-agent/logs
+ReadWritePaths=/opt/video-agent/queue /opt/video-agent/state /opt/video-agent/logs /tmp
 
 [Install]
 WantedBy=multi-user.target
